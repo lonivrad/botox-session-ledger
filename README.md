@@ -173,7 +173,7 @@ Calculates:
 
 ```text
 hw5-Loni/
-├─ .agents/
+├─ agents/
 │  └─ skills/
 │     └─ botox-session-ledger/
 │        ├─ SKILL.md
@@ -191,13 +191,13 @@ hw5-Loni/
 From the repository root:
 
 ```bash
-cd ~/Desktop/hw5-Loni
+cd ~/code/hw5-Loni
 ```
 
 Run with Python:
 
 ```bash
-python3 .agents/skills/botox-session-ledger/scripts/botox_session_ledger.py \
+python3 agents/skills/botox-session-ledger/scripts/botox_session_ledger.py \
   --client "Jane" \
   --product "Botox" \
   --diluent "2.5 mL" \
