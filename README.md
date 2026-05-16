@@ -32,8 +32,9 @@ This is not a clinical dosing tool. It only performs operational and financial c
 ```text
 botox-session-ledger/
 ├── botox_session_ledger.py        ← core calculation engine (v1, preserved)
+├── api.py                         ← deprecated shim; re-exports app from app.main
 ├── app/
-│   ├── main.py                    ← FastAPI app + static file serving
+│   ├── main.py                    ← FastAPI app, /ledger endpoint, static serving
 │   ├── database.py                ← SQLAlchemy engine, SessionLocal, Base
 │   ├── models.py                  ← ORM models (Client, Vial, Session, etc.)
 │   ├── schemas.py                 ← Pydantic v2 request/response schemas
@@ -47,18 +48,17 @@ botox-session-ledger/
 │   │   ├── session_service.py     ← session creation, calls ledger engine
 │   │   └── analytics_service.py  ← revenue, profitability, waste, reorder
 │   └── static/
-│       └── index.html             ← single-page dashboard (Tailwind + Chart.js)
+│       ├── index.html             ← single-page dashboard markup
+│       ├── style.css              ← all custom styles
+│       └── app.js                 ← all frontend logic (Tailwind + Chart.js)
 ├── alembic/
 │   ├── env.py
 │   └── versions/
 │       └── 001_initial_schema.py
-├── agents/
-│   └── skills/
-│       └── botox-session-ledger/  ← original AI skill (SKILL.md + references)
 ├── tests/
 │   ├── conftest.py
-│   ├── test_ledger.py             ← 84 unit tests for the calculation engine
-│   └── test_api.py
+│   ├── test_ledger.py             ← unit tests for the calculation engine
+│   └── test_api.py                ← HTTP contract tests for the API surface
 ├── alembic.ini
 ├── Dockerfile
 ├── Makefile
@@ -183,7 +183,7 @@ Practitioner (nullable FK throughout — ready for multi-user, no auth required 
 
 ## Calculation Engine
 
-`botox_session_ledger.py` is the original v1 script, preserved intact as the calculation core. When a session is created, `session_service.py` calls `build_ledger_data()` from this module — so all 84 existing unit tests continue to pass and the math is identical to the original.
+`botox_session_ledger.py` is the original v1 script, preserved intact as the calculation core. When a session is created, `session_service.py` calls `build_ledger_data()` from this module — so all unit tests continue to pass and the math is identical to the original.
 
 The engine handles:
 
@@ -218,6 +218,14 @@ GitHub Actions runs on every push:
 1. `ruff check .` — linting
 2. `mypy --strict` — type checking
 3. `pytest --cov-fail-under=80` — tests with coverage gate
+
+---
+
+## Production Considerations
+
+**Authentication is intentionally out of scope for this demo.** The API has no auth layer — any request can read or write any record. A production deployment would add OAuth2/JWT via FastAPI's built-in security utilities (`OAuth2PasswordBearer`, dependency-injected `get_current_user`), with per-practitioner row-level scoping on all queries. The data model already carries a `practitioner_id` foreign key throughout in anticipation of this.
+
+Other production concerns not addressed here: HTTPS termination, secrets management, a persistent Postgres database (swap the `DATABASE_URL` env var), rate limiting, and audit logging.
 
 ---
 
