@@ -340,136 +340,165 @@ class TestCalculatePricing:
 
 
 # ─────────────────────────────────────────────
-# build_ledger — integration tests
+# build_ledger_data — end-to-end numeric tests
+# (test the data layer, not the formatted string)
 # ─────────────────────────────────────────────
 
+JANE_PLAN = (
+    "Forehead Lines: 8 units\n"
+    "Frown Lines: 12 units\n"
+    "Masseters: 20 units each side"
+)
 
-class TestBuildLedger:
-    # Jane's treatment plan from README Test 1
-    JANE_PLAN = (
-        "Forehead Lines: 8 units\n"
-        "Frown Lines: 12 units\n"
-        "Masseters: 20 units each side"
-    )
+
+class TestBuildLedgerData:
+    """End-to-end tests that verify computed values, not formatted output."""
 
     def test_jane_total_units(self):
-        """README Test 1: Jane → 60 total units (8 + 12 + 20*2)."""
-        ledger = build_ledger(
-            client="Jane",
-            product="Botox",
-            diluent_text="2.5 mL",
-            treatment_plan=self.JANE_PLAN,
-            pricing_mode="standard",
-            client_charge="$420",
+        """8 + 12 + (20×2) = 60 total units."""
+        data = build_ledger_data(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan=JANE_PLAN, pricing_mode="standard", client_charge="$420",
         )
-        assert "60" in ledger
+        assert data.total_units == 60.0
 
     def test_jane_total_volume(self):
-        """README Test 1: Jane → 1.50 mL total volume."""
-        ledger = build_ledger(
-            client="Jane",
-            product="Botox",
-            diluent_text="2.5 mL",
-            treatment_plan=self.JANE_PLAN,
-            pricing_mode="standard",
-            client_charge="$420",
+        """60 units / 40 u/mL = 1.50 mL."""
+        data = build_ledger_data(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan=JANE_PLAN, pricing_mode="standard",
         )
-        assert "1.50 mL" in ledger
+        assert pytest.approx(data.total_volume_ml, rel=1e-4) == 1.5
 
-    def test_jane_vial_remaining(self):
-        """README Test 1: Jane → 40 units remaining."""
-        ledger = build_ledger(
-            client="Jane",
-            product="Botox",
-            diluent_text="2.5 mL",
-            treatment_plan=self.JANE_PLAN,
-            pricing_mode="standard",
-            client_charge="$420",
+    def test_jane_remaining_units(self):
+        """100-unit vial minus 60 used = 40 remaining."""
+        data = build_ledger_data(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan=JANE_PLAN, pricing_mode="standard",
         )
-        assert "40" in ledger
+        assert data.expected_remaining_units == 40.0
 
-    def test_jane_gross_margin(self):
-        """README Test 1: Jane at $420 → ~5.5% gross margin."""
-        ledger = build_ledger(
-            client="Jane",
-            product="Botox",
-            diluent_text="2.5 mL",
-            treatment_plan=self.JANE_PLAN,
-            pricing_mode="standard",
-            client_charge="$420",
+    def test_jane_gross_margin_at_420(self):
+        """At $420 charge, gross margin ≈ 5.5% (low because cost is ~$397)."""
+        data = build_ledger_data(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan=JANE_PLAN, pricing_mode="standard", client_charge="$420",
         )
-        assert "5.5%" in ledger
+        assert data.pricing.gross_margin_percent == pytest.approx(5.5, abs=0.3)
 
-    def test_family_friend_recommended_charge(self):
-        """README Test 2: Sarah, family-friend → $320 recommended charge (32 units × $10)."""
-        plan = "Crow's Feet: 10 units each side\nFrown Lines: 12 units"
-        ledger = build_ledger(
-            client="Sarah",
-            product="Botox",
-            diluent_text="2.5 mL",
-            treatment_plan=plan,
-            pricing_mode="family-friend",
+    def test_concentration_from_diluent(self):
+        """100 units / 2.5 mL = 40 u/mL concentration."""
+        data = build_ledger_data(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan="Forehead: 8 units", pricing_mode="standard",
         )
-        assert "Family-friend" in ledger
-        assert "$320.00" in ledger
+        assert data.concentration == pytest.approx(40.0, rel=1e-4)
 
     def test_different_reconstitution_changes_concentration(self):
-        """README Test 4: Emily, 1.0 mL → concentration 100 units/mL."""
-        ledger = build_ledger(
-            client="Emily",
-            product="Botox",
-            diluent_text="1.0 mL",
-            treatment_plan="Forehead Lines: 8 units",
+        """1.0 mL diluent → 100 u/mL concentration."""
+        data = build_ledger_data(
+            client="Emily", product="Botox", diluent_text="1.0 mL",
+            treatment_plan="Forehead Lines: 8 units", pricing_mode="standard",
+        )
+        assert data.concentration == pytest.approx(100.0, rel=1e-4)
+
+    def test_family_friend_recommended_charge(self):
+        """family-friend: 32 units × $10/unit = $320."""
+        plan = "Crow's Feet: 10 units each side\nFrown Lines: 12 units"
+        data = build_ledger_data(
+            client="Sarah", product="Botox", diluent_text="2.5 mL",
+            treatment_plan=plan, pricing_mode="family-friend",
+        )
+        assert data.pricing.recommended_charge == 320.0
+        assert "Family-friend" in data.pricing.pricing_label
+
+    def test_multiple_entries_parsed_correctly(self):
+        """Three plan lines produce three entries with correct total units."""
+        data = build_ledger_data(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan="Forehead Lines: 8 units\nFrown Lines: 12 units",
             pricing_mode="standard",
         )
-        assert "100 units/mL" in ledger
+        assert data.total_units == 20.0
+        assert len(data.entries) == 2
 
-    def test_over_vial_triggers_warning(self):
-        """Using more than 100 units should produce an inventory warning flag."""
-        ledger = build_ledger(
-            client="Test",
-            product="Botox",
-            diluent_text="2.5 mL",
+    def test_over_vial_sets_flag(self):
+        """Exceeding 100 units sets a flag in the structured data."""
+        data = build_ledger_data(
+            client="Test", product="Botox", diluent_text="2.5 mL",
             treatment_plan="Area A: 60 units\nArea B: 60 units",
             pricing_mode="standard",
         )
-        assert "exceeds the 100-unit vial" in ledger
+        assert any("exceeds the 100-unit vial" in f for f in data.flags)
 
-    def test_non_botox_product_triggers_warning(self):
-        """Non-Botox product name should produce a product warning flag."""
-        ledger = build_ledger(
-            client="Test",
-            product="Dysport",
-            diluent_text="2.5 mL",
-            treatment_plan="Forehead: 8 units",
-            pricing_mode="standard",
+    def test_non_botox_product_sets_flag(self):
+        """Non-Botox product name triggers a product-warning flag."""
+        data = build_ledger_data(
+            client="Test", product="Dysport", diluent_text="2.5 mL",
+            treatment_plan="Forehead: 8 units", pricing_mode="standard",
         )
-        assert "Dysport" in ledger
-        assert "designed around" in ledger
+        assert any("Dysport" in f for f in data.flags)
 
-    def test_standard_disclaimer_flags_always_present(self):
-        """Core disclaimer flags must appear in every ledger."""
-        ledger = build_ledger(
-            client="Jane",
-            product="Botox",
-            diluent_text="2.5 mL",
-            treatment_plan="Forehead: 8 units",
-            pricing_mode="standard",
+    def test_disclaimer_flags_always_present(self):
+        """Core safety disclaimer flags must always be present."""
+        data = build_ledger_data(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan="Forehead: 8 units", pricing_mode="standard",
         )
-        assert "Dose values were user-provided." in ledger
-        assert "does not validate clinical appropriateness" in ledger
+        combined = " ".join(data.flags)
+        assert "Dose values were user-provided." in combined
+        assert "does not validate clinical appropriateness" in combined
 
-    def test_semicolon_separator_parsed_correctly(self):
-        """Semicolons in treatment plan (CLI usage) should be treated as newlines."""
+
+# ─────────────────────────────────────────────
+# build_ledger (formatter) — tests for output
+# that can ONLY be verified via the string repr
+# ─────────────────────────────────────────────
+
+
+class TestBuildLedgerFormatter:
+    """Only tests that are specific to the text formatter belong here.
+    Numeric correctness is already proven in TestBuildLedgerData above."""
+
+    def test_returns_non_empty_string(self):
         ledger = build_ledger(
-            client="Jane",
-            product="Botox",
-            diluent_text="2.5 mL",
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan=JANE_PLAN, pricing_mode="standard",
+        )
+        assert isinstance(ledger, str) and len(ledger) > 100
+
+    def test_client_name_appears_in_output(self):
+        ledger = build_ledger(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan=JANE_PLAN, pricing_mode="standard",
+        )
+        assert "Jane" in ledger
+
+    def test_concentration_label_formatted(self):
+        """Formatter should emit the concentration in 'X units/mL' form."""
+        ledger = build_ledger(
+            client="Emily", product="Botox", diluent_text="1.0 mL",
+            treatment_plan="Forehead Lines: 8 units", pricing_mode="standard",
+        )
+        assert "100 units/mL" in ledger
+
+    def test_volume_formatted_to_two_decimal_places(self):
+        """Total volume must appear as '1.50 mL', not '1.5 mL'."""
+        ledger = build_ledger(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
+            treatment_plan=JANE_PLAN, pricing_mode="standard",
+        )
+        assert "1.50 mL" in ledger
+
+    def test_semicolon_separator_replaced_by_formatter(self):
+        """build_ledger replaces semicolons with newlines so both areas appear."""
+        ledger = build_ledger(
+            client="Jane", product="Botox", diluent_text="2.5 mL",
             treatment_plan="Forehead Lines: 8 units;Frown Lines: 12 units",
             pricing_mode="standard",
         )
-        # Both areas parsed → 20 total units
-        assert "20" in ledger
+        assert "Forehead Lines" in ledger
+        assert "Frown Lines" in ledger
 
 
 # ─────────────────────────────────────────────

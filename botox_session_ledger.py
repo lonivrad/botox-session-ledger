@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 
 import argparse
 import dataclasses
@@ -6,7 +7,6 @@ import json
 import math
 import re
 from dataclasses import dataclass
-from typing import Any, List, Optional
 
 # -----------------------------
 # Custom exceptions
@@ -89,11 +89,11 @@ class SessionCosts:
 @dataclass
 class PricingResult:
     pricing_label: str
-    recommended_charge: Optional[float]
-    recommended_per_unit: Optional[float]
-    actual_client_charge: Optional[float]
-    gross_margin: Optional[float]
-    gross_margin_percent: Optional[float]
+    recommended_charge: float | None
+    recommended_per_unit: float | None
+    actual_client_charge: float | None
+    gross_margin: float | None
+    gross_margin_percent: float | None
 
 
 @dataclass
@@ -104,7 +104,7 @@ class LedgerData:
     product: str
     diluent_ml: float
     concentration: float
-    entries: List[TreatmentEntry]
+    entries: list[TreatmentEntry]
     total_units: float
     total_volume_ml: float
     total_u100_markings: float
@@ -112,7 +112,7 @@ class LedgerData:
     vial_percent_used: float
     costs: SessionCosts
     pricing: PricingResult
-    flags: List[str]
+    flags: list[str]
 
 
 # -----------------------------
@@ -134,7 +134,7 @@ def parse_diluent(text: str) -> float:
     return diluent
 
 
-def parse_money(value: Optional[str]) -> Optional[float]:
+def parse_money(value: str | None) -> float | None:
     if value is None:
         return None
 
@@ -151,7 +151,7 @@ def parse_money(value: Optional[str]) -> Optional[float]:
     return amount
 
 
-def parse_custom_price(value: Optional[str]) -> Optional[float]:
+def parse_custom_price(value: str | None) -> float | None:
     if value is None:
         return None
 
@@ -168,7 +168,7 @@ def parse_custom_price(value: Optional[str]) -> Optional[float]:
     return price
 
 
-def parse_treatment_plan(plan_text: str, concentration: float) -> List[TreatmentEntry]:
+def parse_treatment_plan(plan_text: str, concentration: float) -> list[TreatmentEntry]:
     """
     Parses treatment plan lines like:
     Forehead Lines: 8 units
@@ -182,7 +182,7 @@ def parse_treatment_plan(plan_text: str, concentration: float) -> List[Treatment
     if not plan_text.strip():
         raise InvalidTreatmentPlanError("Treatment plan is required.")
 
-    entries: List[TreatmentEntry] = []
+    entries: list[TreatmentEntry] = []
     lines = [line.strip() for line in plan_text.splitlines() if line.strip()]
 
     for line in lines:
@@ -300,8 +300,8 @@ def calculate_pricing(
     total_units: float,
     total_session_cost_mid: float,
     pricing_mode: str,
-    client_charge: Optional[str],
-    custom_price: Optional[str],
+    client_charge: str | None,
+    custom_price: str | None,
 ) -> PricingResult:
     """
     Calculates recommended pricing and gross margin based on pricing mode and session costs.
@@ -312,8 +312,8 @@ def calculate_pricing(
     actual_client_charge = parse_money(client_charge)
     custom_price_per_unit = parse_custom_price(custom_price)
 
-    recommended_charge: Optional[float] = None
-    recommended_per_unit: Optional[float] = None
+    recommended_charge: float | None = None
+    recommended_per_unit: float | None = None
 
     if actual_client_charge is None:
         if pricing_mode_clean in ["family-friend", "family friend", "friend", "family"]:
@@ -343,8 +343,8 @@ def calculate_pricing(
         actual_client_charge if actual_client_charge is not None else recommended_charge
     )
 
-    gross_margin: Optional[float] = None
-    gross_margin_percent: Optional[float] = None
+    gross_margin: float | None = None
+    gross_margin_percent: float | None = None
 
     if charge_for_margin is not None:
         gross_margin = charge_for_margin - total_session_cost_mid
@@ -373,14 +373,20 @@ def build_ledger_data(
     diluent_text: str,
     treatment_plan: str,
     pricing_mode: str = "standard",
-    client_charge: Optional[str] = None,
-    custom_price: Optional[str] = None,
+    client_charge: str | None = None,
+    custom_price: str | None = None,
 ) -> LedgerData:
     """
     Parses inputs, runs all calculations, and returns structured LedgerData.
     Use this when you need the data (API, JSON output, downstream processing).
     For a formatted text report, use build_ledger().
+
+    Semicolons in treatment_plan are accepted as line separators and are
+    normalised to newlines before parsing (CLI/API convenience format).
     """
+    # Normalise semicolon separators so callers don't have to pre-process.
+    treatment_plan = treatment_plan.replace(";", "\n")
+
     product_clean = product.strip() if product else "Botox"
 
     product_warning = None
@@ -444,7 +450,7 @@ def build_ledger_data(
     )
 
 
-def ledger_to_dict(data: LedgerData) -> dict[str, Any]:
+def ledger_to_dict(data: LedgerData) -> dict[str, object]:
     """Converts LedgerData to a JSON-serializable dict via dataclasses.asdict()."""
     return dataclasses.asdict(data)
 
@@ -572,8 +578,8 @@ def build_ledger(
     diluent_text: str,
     treatment_plan: str,
     pricing_mode: str = "standard",
-    client_charge: Optional[str] = None,
-    custom_price: Optional[str] = None,
+    client_charge: str | None = None,
+    custom_price: str | None = None,
 ) -> str:
     """
     Returns a formatted text ledger report.

@@ -8,7 +8,7 @@ Run locally:
 Interactive docs: http://localhost:8000/docs
 """
 
-from typing import Any, Optional
+from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -44,12 +44,12 @@ class LedgerRequest(BaseModel):
         examples=["standard"],
         description="Pricing strategy: 'standard' (20% margin), 'family-friend' ($10/unit), or 'custom'.",
     )
-    client_charge: Optional[str] = Field(
+    client_charge: str | None = Field(
         None,
         examples=["$420"],
         description="Actual amount charged. If omitted, a recommended charge is calculated.",
     )
-    custom_price: Optional[str] = Field(
+    custom_price: str | None = Field(
         None,
         examples=["$12/unit"],
         description="Required when pricing_mode is 'custom'.",

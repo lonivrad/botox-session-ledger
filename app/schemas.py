@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -33,30 +32,30 @@ class PractitionerOut(BaseModel):
 
 class ClientCreate(BaseModel):
     name: str = Field(..., examples=["Jane Smith"])
-    email: Optional[str] = Field(None, examples=["jane@example.com"])
-    phone: Optional[str] = Field(None, examples=["555-1234"])
-    notes: Optional[str] = None
-    practitioner_id: Optional[int] = None
+    email: str | None = Field(None, examples=["jane@example.com"])
+    phone: str | None = Field(None, examples=["555-1234"])
+    notes: str | None = None
+    practitioner_id: int | None = None
 
 
 class ClientUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    notes: Optional[str] = None
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    notes: str | None = None
 
 
 class ClientOut(BaseModel):
     id: int
     name: str
-    email: Optional[str]
-    phone: Optional[str]
-    notes: Optional[str]
-    practitioner_id: Optional[int]
+    email: str | None
+    phone: str | None
+    notes: str | None
+    practitioner_id: int | None
     created_at: datetime
     session_count: int = 0
-    last_session_date: Optional[datetime] = None
-    next_appointment_estimate: Optional[datetime] = None
+    last_session_date: datetime | None = None
+    next_appointment_estimate: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -64,11 +63,11 @@ class ClientOut(BaseModel):
 class ClientSummary(BaseModel):
     id: int
     name: str
-    email: Optional[str]
-    phone: Optional[str]
+    email: str | None
+    phone: str | None
     session_count: int = 0
-    last_session_date: Optional[datetime] = None
-    next_appointment_estimate: Optional[datetime] = None
+    last_session_date: datetime | None = None
+    next_appointment_estimate: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -80,20 +79,20 @@ class ClientSummary(BaseModel):
 
 class VialCreate(BaseModel):
     product: str = Field("Botox", examples=["Botox"])
-    lot_number: Optional[str] = Field(None, examples=["ABC123"])
+    lot_number: str | None = Field(None, examples=["ABC123"])
     units_total: float = Field(100.0, examples=[100.0])
     diluent_ml: float = Field(..., examples=[2.5])
     cost: float = Field(656.00, examples=[656.00])
     expiry_hours: int = Field(
         24, examples=[24], description="Hours until vial expires after reconstitution"
     )
-    practitioner_id: Optional[int] = None
+    practitioner_id: int | None = None
 
 
 class VialOut(BaseModel):
     id: int
     product: str
-    lot_number: Optional[str]
+    lot_number: str | None
     units_total: float
     units_remaining: float
     units_used: float
@@ -101,8 +100,8 @@ class VialOut(BaseModel):
     concentration: float
     cost: float
     expiry_hours: int
-    opened_at: Optional[datetime]
-    expires_at: Optional[datetime]
+    opened_at: datetime | None
+    expires_at: datetime | None
     status: str
     percent_used: float
     created_at: datetime
@@ -122,17 +121,17 @@ class VialStatusUpdate(BaseModel):
 class SessionCreate(BaseModel):
     client_id: int
     vial_id: int
-    session_date: Optional[datetime] = None  # defaults to now
+    session_date: datetime | None = None  # defaults to now
     treatment_plan: str = Field(
         ...,
         examples=["Forehead Lines: 8 units\nFrown Lines: 12 units\nMasseters: 20 units each side"],
         description="Treatment areas and units, one per line.",
     )
     pricing_mode: str = Field("standard", examples=["standard"])
-    client_charge: Optional[str] = Field(None, examples=["$420"])
-    custom_price: Optional[str] = Field(None, examples=["$12/unit"])
-    notes: Optional[str] = None
-    practitioner_id: Optional[int] = None
+    client_charge: str | None = Field(None, examples=["$420"])
+    custom_price: str | None = Field(None, examples=["$12/unit"])
+    notes: str | None = None
+    practitioner_id: int | None = None
 
 
 class SessionAreaOut(BaseModel):
@@ -158,16 +157,16 @@ class SessionOut(BaseModel):
     client_name: str
     session_date: datetime
     pricing_mode: str
-    client_charge: Optional[float]
-    recommended_charge: Optional[float]
-    effective_charge: Optional[float]
-    custom_price_per_unit: Optional[float]
-    notes: Optional[str]
+    client_charge: float | None
+    recommended_charge: float | None
+    effective_charge: float | None
+    custom_price_per_unit: float | None
+    notes: str | None
     total_units: float
     total_volume_ml: float
     total_session_cost: float
-    gross_margin: Optional[float]
-    gross_margin_percent: Optional[float]
+    gross_margin: float | None
+    gross_margin_percent: float | None
     areas: list[SessionAreaOut]
     vial_allocations: list[VialAllocationOut]
     created_at: datetime
@@ -181,8 +180,8 @@ class SessionSummary(BaseModel):
     client_name: str
     session_date: datetime
     total_units: float
-    effective_charge: Optional[float]
-    gross_margin_percent: Optional[float]
+    effective_charge: float | None
+    gross_margin_percent: float | None
 
     model_config = {"from_attributes": True}
 
@@ -216,7 +215,7 @@ class ClientProfitability(BaseModel):
     total_cost: float
     gross_margin: float
     gross_margin_percent: float
-    last_session_date: Optional[datetime]
+    last_session_date: datetime | None
 
 
 class WasteReport(BaseModel):
@@ -233,5 +232,5 @@ class ReorderAlert(BaseModel):
     vials_in_stock: int
     active_vials: int
     avg_sessions_per_week: float
-    estimated_weeks_remaining: Optional[float]
+    estimated_weeks_remaining: float | None
     recommended_reorder_qty: int
