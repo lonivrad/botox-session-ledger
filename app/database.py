@@ -19,7 +19,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def get_db():
+def get_db() -> object:
     """FastAPI dependency that yields a database session."""
     db = SessionLocal()
     try:

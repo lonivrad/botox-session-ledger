@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from sqlalchemy.orm import Session as DBSession
 
@@ -191,7 +192,7 @@ def next_appointment_estimate(last_session_date: datetime) -> datetime:
     return last_session_date + timedelta(weeks=TOUCH_UP_WEEKS)
 
 
-def clients_due_for_touchup(db: DBSession) -> list[dict]:
+def clients_due_for_touchup(db: DBSession) -> list[dict[str, Any]]:
     """Return clients whose estimated next appointment is within the next 4 weeks."""
     now = datetime.now(timezone.utc)
     four_weeks_from_now = now + timedelta(weeks=4)

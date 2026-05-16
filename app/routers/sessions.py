@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
-from app.schemas import SessionCreate, SessionOut, SessionSummary
+from app.schemas import SessionAreaOut, SessionCreate, SessionOut, SessionSummary, VialAllocationOut
 from app.services.session_service import create_session, get_session, list_sessions
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -30,17 +30,17 @@ def _to_out(session) -> SessionOut:  # type: ignore[no-untyped-def]
         gross_margin=session.gross_margin,
         gross_margin_percent=session.gross_margin_percent,
         areas=[
-            {
-                "id": a.id,
-                "area_name": a.area_name,
-                "units": a.units,
-                "volume_ml": a.volume_ml,
-                "u100_markings": a.u100_markings,
-            }
+            SessionAreaOut(
+                id=a.id,
+                area_name=a.area_name,
+                units=a.units,
+                volume_ml=a.volume_ml,
+                u100_markings=a.u100_markings,
+            )
             for a in session.areas
         ],
         vial_allocations=[
-            {"vial_id": va.vial_id, "units_allocated": va.units_allocated}
+            VialAllocationOut(vial_id=va.vial_id, units_allocated=va.units_allocated)
             for va in session.vial_allocations
         ],
         created_at=session.created_at,

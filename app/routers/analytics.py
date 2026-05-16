@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session as DBSession
 
@@ -45,6 +47,6 @@ def get_reorder_alert(db: DBSession = Depends(get_db)) -> ReorderAlert:
 
 
 @router.get("/clients/touchup-due")
-def get_touchup_due(db: DBSession = Depends(get_db)) -> list[dict]:  # type: ignore[type-arg]
+def get_touchup_due(db: DBSession = Depends(get_db)) -> list[dict[str, Any]]:
     """Clients whose estimated next appointment is within the next 4 weeks."""
     return clients_due_for_touchup(db)
