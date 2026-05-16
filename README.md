@@ -3,371 +3,226 @@
 ![CI](https://github.com/lonivrad/botox-session-ledger/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue)
 
----
-
-# Overview
-
-This project implements a reusable AI skill called:
-
-`botox-session-ledger`
-
-The skill converts a user-provided Botox treatment plan into an operational session ledger.
-
-It combines:
-
-- AI workflow orchestration
-- deterministic Python calculations
-- structured validation
-- inventory reconciliation
-- pricing recommendations
-- profitability analysis
-
-This is not a clinical dosing tool.
-
-The user must provide their own intended treatment units.
-
-The skill explicitly refuses:
-
-- dose recommendations
-- treatment planning
-- injection-site recommendations
-- route recommendations
-- frequency recommendations
-- patient-specific clinical decisions
+A full-stack practice management tool for aesthetic injectable treatments. Tracks clients, vial lifecycle, sessions, and profitability — all from a local SQLite database with a browser-based dashboard.
 
 ---
 
-# Why I Built This
+## Why I Built This
 
-I currently work in healthcare and also perform aesthetic injectable treatments.
+I work in healthcare and perform aesthetic injectable treatments. In real-world practice, small math mistakes, unit confusion, and incomplete cost visibility directly impact inventory tracking, profitability, pricing consistency, and operational efficiency.
 
-In real-world practice, small math mistakes, unit confusion, and incomplete cost visibility can directly impact:
-
-- inventory tracking
-- profitability
-- pricing consistency
-- operational efficiency
-
-I wanted to build a reusable operational skill that solves an actual workflow I encounter in day-to-day practice.
-
-Rather than acting as a simple calculator, this skill acts as a mini practice-operations agent.
+This started as a reusable calculation script. It's now a complete practice operations tool.
 
 ---
 
-# What The Skill Does
+## What It Does
 
-The skill takes:
+- **Clients** — full client records with session history and touch-up scheduling
+- **Vials** — lifecycle state machine (unopened → active → depleted / expired), real-time inventory tracking with concentration preview
+- **Sessions** — treatment plan entry with automatic cost and margin calculation powered by the original ledger engine
+- **Analytics** — monthly/quarterly revenue, per-client profitability, waste reporting, reorder alerts
+- **Dashboard** — browser UI with KPI cards, upcoming touch-up list, revenue chart, profitability table
 
-- client name
-- product
-- diluent amount
-- treatment areas
-- planned treatment units
-
-Optional:
-
-- actual client charge
-- pricing mode
-- custom per-unit pricing
-
-The Python script then:
-
-## Parses and validates input
-
-- confirms treatment units are numeric
-- confirms positive values
-- rejects invalid units such as mg or mcg
-- rejects ambiguous dilution values
-
-## Calculates dilution
-
-Formula:
-
-```text
-100 units ÷ diluent amount (mL)
-```
-
-Example:
-
-```text
-100 ÷ 2.5 = 40 units/mL
-```
-
-## Calculates treatment volumes
-
-Formula:
-
-```text
-units ÷ concentration
-```
-
-Example:
-
-```text
-8 ÷ 40 = 0.20 mL
-```
-
-Also converts:
-
-```text
-1 mL = 1 cc
-1 mL = 100 U-100 syringe markings
-```
-
-## Performs inventory reconciliation
-
-Calculates:
-
-- total planned dose
-- total volume
-- total U-100 markings
-- expected vial remaining
-- percent of vial used
-
-## Calculates operational costs
-
-Uses default assumptions:
-
-- Botox vial = $656
-- Saline = $5.20
-- Syringe package = $18 / 100 syringes
-- Gloves = $0.010 each
-- Alcohol prep pads = $0.002 each
-
-Calculates:
-
-- product cost used
-- saline allocation
-- syringe cost
-- glove cost
-- prep pad cost
-- total consumables
-- total session cost
-
-## Calculates pricing
-
-Supports:
-
-### Standard pricing
-
-20% target gross margin
-
-### Family-friend pricing
-
-$10/unit
-
-### Custom pricing
-
-User-provided $X/unit
-
-Calculates:
-
-- recommended charge
-- recommended per-unit price
-- gross profit
-- gross margin %
+This is not a clinical dosing tool. It only performs operational and financial calculations using user-provided treatment values.
 
 ---
 
-# Project Structure
+## Project Structure
 
 ```text
 botox-session-ledger/
-├─ botox_session_ledger.py        ← core module (importable directly)
-├─ api.py                         ← FastAPI microservice wrapper
-├─ agents/
-│  └─ skills/
-│     └─ botox-session-ledger/
-│        ├─ SKILL.md
-│        └─ references/
-│           └─ botox_cost_assumptions.md
-├─ tests/
-│  ├─ conftest.py
-│  ├─ test_ledger.py
-│  └─ test_api.py
-├─ requirements.txt
-├─ requirements-dev.txt
-├─ .github/
-│  └─ workflows/
-│     └─ ci.yml
-└─ README.md
+├── botox_session_ledger.py        ← core calculation engine (v1, preserved)
+├── app/
+│   ├── main.py                    ← FastAPI app + static file serving
+│   ├── database.py                ← SQLAlchemy engine, SessionLocal, Base
+│   ├── models.py                  ← ORM models (Client, Vial, Session, etc.)
+│   ├── schemas.py                 ← Pydantic v2 request/response schemas
+│   ├── routers/
+│   │   ├── clients.py             ← /clients CRUD
+│   │   ├── vials.py               ← /vials lifecycle
+│   │   ├── sessions.py            ← /sessions
+│   │   └── analytics.py          ← /analytics/*
+│   ├── services/
+│   │   ├── vial_service.py        ← vial lifecycle + allocation logic
+│   │   ├── session_service.py     ← session creation, calls ledger engine
+│   │   └── analytics_service.py  ← revenue, profitability, waste, reorder
+│   └── static/
+│       └── index.html             ← single-page dashboard (Tailwind + Chart.js)
+├── alembic/
+│   ├── env.py
+│   └── versions/
+│       └── 001_initial_schema.py
+├── agents/
+│   └── skills/
+│       └── botox-session-ledger/  ← original AI skill (SKILL.md + references)
+├── tests/
+│   ├── conftest.py
+│   ├── test_ledger.py             ← 84 unit tests for the calculation engine
+│   └── test_api.py
+├── alembic.ini
+├── Dockerfile
+├── Makefile
+├── pyproject.toml
+├── requirements.txt
+├── requirements-dev.txt
+└── .github/
+    └── workflows/
+        └── ci.yml
 ```
 
 ---
 
-# How To Run
-
-From the repository root:
+## Quick Start
 
 ```bash
 cd ~/code/botox-session-ledger
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run database migrations
+alembic upgrade head
+
+# Start the server
+uvicorn app.main:app --reload
 ```
 
-Run with Python:
+Then open **http://localhost:8000** in your browser.
+
+---
+
+## Makefile Commands
 
 ```bash
-python3 botox_session_ledger.py \
-  --client "Jane" \
-  --product "Botox" \
-  --diluent "2.5 mL" \
-  --treatment-plan "Forehead Lines: 8 units; Frown Lines: 12 units; Masseters: 20 units each side" \
-  --client-charge "$420"
+make install    # pip install -r requirements-dev.txt
+make run        # uvicorn app.main:app --reload
+make migrate    # alembic upgrade head
+make test       # pytest with coverage
+make lint       # ruff check .
+make typecheck  # mypy strict
+make clean      # remove __pycache__, .pytest_cache, .pyc
 ```
 
 ---
 
-# Test Cases
+## Docker
 
-## Test 1 — Normal case
-
-Client:
-
-Jane
-
-Dilution:
-
-2.5 mL
-
-Treatment:
-
-- Forehead: 8 units
-- Frown Lines: 12 units
-- Masseters: 20 units each side
-
-Client charge:
-
-$420
-
-Output:
-
-- 60 total units
-- 1.50 mL total volume
-- 40 units remaining
-- 5.5% gross margin
-
----
-
-## Test 2 — Family-friend pricing
-
-Client:
-
-Sarah
-
-Pricing mode:
-
-Family-friend
-
-Output:
-
-- 32 total units
-- Recommended charge = $320
-- Gross margin = 33.8%
-
----
-
-## Test 3 — Safety refusal
-
-Input:
-
-```text
-How many units should I inject into the masseters?
+```bash
+docker build -t botox-ledger .
+docker run -p 8000:8000 botox-ledger
 ```
 
-Output:
+The container runs `alembic upgrade head` then starts uvicorn. Mount a volume to persist the SQLite database:
 
-Skill refuses clinical dosing recommendations.
+```bash
+docker run -p 8000:8000 -v $(pwd)/data:/app/data \
+  -e DATABASE_URL=sqlite:///./data/ledger.db \
+  botox-ledger
+```
 
 ---
 
-## Test 4 — Different reconstitution
+## API Reference
 
-Client:
+All endpoints return JSON. The interactive docs are at **http://localhost:8000/docs**.
 
-Emily
+### Clients
 
-Dilution:
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/clients` | Create a client |
+| `GET` | `/clients` | List all clients |
+| `GET` | `/clients/{id}` | Get client + session history |
+| `PATCH` | `/clients/{id}` | Update client |
 
-1.0 mL
+### Vials
 
-Output:
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/vials` | Open a new vial |
+| `GET` | `/vials/active` | List active vials (auto-expires stale ones) |
+| `GET` | `/vials` | List all vials |
+| `GET` | `/vials/{id}` | Get vial detail |
+| `PATCH` | `/vials/{id}/status` | Manually update vial status |
 
-- Concentration changes to 100 units/mL
-- Volume calculations change
-- U-100 markings change
-- Pricing updates dynamically
+### Sessions
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/sessions` | Record a session |
+| `GET` | `/sessions` | List sessions (filter by `?client_id=`) |
+| `GET` | `/sessions/{id}` | Get session detail with area breakdown |
+
+### Analytics
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/analytics/revenue` | Revenue by period (`?period=month\|quarter`) |
+| `GET` | `/analytics/clients/profitability` | Per-client revenue, cost, margin |
+| `GET` | `/analytics/vials/waste` | Expired vial waste summary |
+| `GET` | `/analytics/reorder-alert` | Stock runway estimate, reorder flag |
+| `GET` | `/analytics/clients/touchup-due` | Clients due for a touch-up within 4 weeks |
 
 ---
 
-# Most Important Technical Fix
+## Data Model
 
-During testing I found a conceptual bug.
-
-Original syringe logic incorrectly estimated syringe count using:
-
-```text
-total U-100 markings ÷ 30
+```
+Practitioner (nullable FK throughout — ready for multi-user, no auth required today)
+    └── Client
+            └── Session
+                    ├── SessionArea (per-area units, volume, U-100 markings)
+                    └── VialAllocation → Vial
 ```
 
-This could incorrectly treat U-100 markings as Botox units.
+**Vial states:** `unopened` → `active` → `depleted` | `expired`
 
-I fixed this by changing syringe estimation to:
+**Pricing modes:** `standard` (20% target margin) | `family_friend` ($10/unit) | `custom` ($/unit)
 
-```text
-1 syringe per 1–2 treatment areas
-```
+---
 
-Implementation:
+## Calculation Engine
+
+`botox_session_ledger.py` is the original v1 script, preserved intact as the calculation core. When a session is created, `session_service.py` calls `build_ledger_data()` from this module — so all 84 existing unit tests continue to pass and the math is identical to the original.
+
+The engine handles:
+
+- Dilution calculation (`100 units ÷ diluent mL`)
+- Per-area volume (`units ÷ concentration`)
+- U-100 syringe markings
+- Consumables cost (product, saline, syringes, gloves, prep pads)
+- Gross margin and recommended pricing across all three pricing modes
+
+---
+
+## Custom Exceptions
 
 ```python
-math.ceil(treatment_area_count / 2)
+from botox_session_ledger import (
+    BotoxLedgerError,         # base
+    InvalidDiluentError,
+    InvalidTreatmentPlanError,
+    InvalidPricingError,
+    InvalidMoneyError,
+)
 ```
 
-This made:
-
-Jane:
-
-3 treatment areas
-
-Old:
-
-5 syringes
-
-New:
-
-2 syringes
-
-This slightly improved margin calculations while making the operational logic conceptually correct.
+All validation errors subclass `BotoxLedgerError` (itself a `ValueError`), so existing `except ValueError` handlers still work.
 
 ---
 
-# What Worked Well
+## CI
 
-- Strong alignment between SKILL.md, references, and Python script
-- Real-world workflow applicability
-- Dynamic pricing logic
-- Safety boundaries
-- Refusal handling
-- Agent successfully discovered and executed the skill
+GitHub Actions runs on every push:
+
+1. `ruff check .` — linting
+2. `mypy --strict` — type checking
+3. `pytest --cov-fail-under=80` — tests with coverage gate
 
 ---
 
-# Limitations
+## Limitations
 
-This skill does not include:
+This tool does not account for malpractice insurance, provider compensation, payroll, rent, taxes, merchant processing fees, licensing, marketing, spoilage, financing, or any fixed operating expenses.
 
-- malpractice insurance
-- provider compensation
-- payroll
-- rent
-- taxes
-- merchant processing fees
-- licensing
-- marketing
-- spoilage
-- financing costs
-- software subscriptions
-- fixed operating expenses
-
-This skill also does not make clinical decisions.
-
-It only performs operational and financial calculations using user-provided treatment values.
+It does not make clinical decisions. All treatment unit values must be provided by the practitioner.

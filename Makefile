@@ -1,4 +1,4 @@
-.PHONY: install test lint run clean
+.PHONY: install test lint typecheck run migrate clean
 
 install:
 	pip install -r requirements-dev.txt
@@ -9,8 +9,14 @@ test:
 lint:
 	ruff check .
 
+typecheck:
+	mypy botox_session_ledger.py api.py
+
+migrate:
+	alembic upgrade head
+
 run:
-	uvicorn api:app --reload
+	uvicorn app.main:app --reload
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +

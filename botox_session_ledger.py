@@ -6,11 +6,12 @@ import json
 import math
 import re
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, List, Optional
 
 # -----------------------------
 # Custom exceptions
 # -----------------------------
+
 
 class BotoxLedgerError(ValueError):
     """Base exception for all botox-session-ledger validation errors."""
@@ -58,6 +59,7 @@ PRACTICAL_VOLUME_WARNING_THRESHOLD_ML = 0.01
 # Data models
 # -----------------------------
 
+
 @dataclass
 class TreatmentEntry:
     area: str
@@ -97,6 +99,7 @@ class PricingResult:
 @dataclass
 class LedgerData:
     """Structured representation of a complete session ledger."""
+
     client: str
     product: str
     diluent_ml: float
@@ -115,6 +118,7 @@ class LedgerData:
 # -----------------------------
 # Parsing helpers
 # -----------------------------
+
 
 def parse_diluent(text: str) -> float:
     match = re.search(r"(\d+(?:\.\d+)?)\s*mL\b", text, re.IGNORECASE)
@@ -151,13 +155,7 @@ def parse_custom_price(value: Optional[str]) -> Optional[float]:
     if value is None:
         return None
 
-    cleaned = (
-        value.lower()
-        .replace("$", "")
-        .replace("/unit", "")
-        .replace("per unit", "")
-        .strip()
-    )
+    cleaned = value.lower().replace("$", "").replace("/unit", "").replace("per unit", "").strip()
 
     try:
         price = float(cleaned)
@@ -215,7 +213,9 @@ def parse_treatment_plan(plan_text: str, concentration: float) -> List[Treatment
         units = float(number_match.group(1))
 
         if units <= 0:
-            raise InvalidTreatmentPlanError(f"Treatment units must be greater than zero in line: '{line}'.")
+            raise InvalidTreatmentPlanError(
+                f"Treatment units must be greater than zero in line: '{line}'."
+            )
 
         if re.search(r"\beach side\b|\bper side\b|\beach masseter\b", detail, re.IGNORECASE):
             units *= 2
@@ -239,6 +239,7 @@ def parse_treatment_plan(plan_text: str, concentration: float) -> List[Treatment
 # -----------------------------
 # Calculation functions
 # -----------------------------
+
 
 def calculate_syringes_required(treatment_area_count: int) -> int:
     """
@@ -266,8 +267,12 @@ def calculate_costs(vial_percent_used: float, treatment_area_count: int) -> Sess
     botox_product_cost_used = DEFAULT_VIAL_COST * vial_percent_used
     saline_cost_allocated = DEFAULT_SALINE_COST_PER_VIAL * vial_percent_used
 
-    consumables_low = syringe_cost_total + prep_pad_cost_low + glove_cost_total + saline_cost_allocated
-    consumables_high = syringe_cost_total + prep_pad_cost_high + glove_cost_total + saline_cost_allocated
+    consumables_low = (
+        syringe_cost_total + prep_pad_cost_low + glove_cost_total + saline_cost_allocated
+    )
+    consumables_high = (
+        syringe_cost_total + prep_pad_cost_high + glove_cost_total + saline_cost_allocated
+    )
 
     total_session_cost_low = botox_product_cost_used + consumables_low
     total_session_cost_high = botox_product_cost_used + consumables_high
@@ -301,7 +306,9 @@ def calculate_pricing(
     """
     Calculates recommended pricing and gross margin based on pricing mode and session costs.
     """
-    pricing_mode_clean = pricing_mode.strip().lower().replace("_", "-") if pricing_mode else "standard"
+    pricing_mode_clean = (
+        pricing_mode.strip().lower().replace("_", "-") if pricing_mode else "standard"
+    )
     actual_client_charge = parse_money(client_charge)
     custom_price_per_unit = parse_custom_price(custom_price)
 
@@ -326,18 +333,24 @@ def calculate_pricing(
             recommended_per_unit = recommended_charge / total_units if total_units > 0 else 0
             pricing_label = "Standard target-margin pricing"
         else:
-            raise InvalidPricingError("Pricing mode must be one of: standard, family-friend, custom.")
+            raise InvalidPricingError(
+                "Pricing mode must be one of: standard, family-friend, custom."
+            )
     else:
         pricing_label = "Actual client charge provided"
 
-    charge_for_margin = actual_client_charge if actual_client_charge is not None else recommended_charge
+    charge_for_margin = (
+        actual_client_charge if actual_client_charge is not None else recommended_charge
+    )
 
     gross_margin: Optional[float] = None
     gross_margin_percent: Optional[float] = None
 
     if charge_for_margin is not None:
         gross_margin = charge_for_margin - total_session_cost_mid
-        gross_margin_percent = (gross_margin / charge_for_margin) * 100 if charge_for_margin > 0 else 0
+        gross_margin_percent = (
+            (gross_margin / charge_for_margin) * 100 if charge_for_margin > 0 else 0
+        )
 
     return PricingResult(
         pricing_label=pricing_label,
@@ -352,6 +365,7 @@ def calculate_pricing(
 # -----------------------------
 # Orchestrator
 # -----------------------------
+
 
 def build_ledger_data(
     client: str,
@@ -430,7 +444,7 @@ def build_ledger_data(
     )
 
 
-def ledger_to_dict(data: LedgerData) -> dict:
+def ledger_to_dict(data: LedgerData) -> dict[str, Any]:
     """Converts LedgerData to a JSON-serializable dict via dataclasses.asdict()."""
     return dataclasses.asdict(data)
 
@@ -438,6 +452,7 @@ def ledger_to_dict(data: LedgerData) -> dict:
 # -----------------------------
 # Formatting
 # -----------------------------
+
 
 def format_money(amount: float) -> str:
     return f"${amount:,.2f}"
@@ -526,6 +541,8 @@ def format_ledger(data: LedgerData) -> str:
     if data.pricing.actual_client_charge is not None:
         output.append(f"Client charge: {format_money(data.pricing.actual_client_charge)}")
     else:
+        assert data.pricing.recommended_charge is not None
+        assert data.pricing.recommended_per_unit is not None
         output.append(f"Recommended charge: {format_money(data.pricing.recommended_charge)}")
         output.append("")
         output.append(
@@ -578,7 +595,8 @@ def build_ledger(
 # CLI entry point
 # -----------------------------
 
-def main():
+
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Create a Botox session ledger from treatment plan, dilution, and pricing inputs."
     )

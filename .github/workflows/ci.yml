@@ -24,5 +24,8 @@ jobs:
       - name: Lint with ruff
         run: ruff check .
 
+      - name: Type check with mypy
+        run: mypy botox_session_ledger.py api.py
+
       - name: Run tests with coverage
         run: pytest tests/ -v --cov=botox_session_ledger --cov=api --cov-report=term-missing --cov-fail-under=80

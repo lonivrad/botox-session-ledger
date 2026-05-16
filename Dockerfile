@@ -2,14 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies first (layer caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY botox_session_ledger.py .
-COPY api.py .
+COPY alembic.ini .
+COPY alembic/ ./alembic/
+COPY app/ ./app/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run migrations then start the server
+CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000

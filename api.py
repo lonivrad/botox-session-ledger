@@ -8,7 +8,7 @@ Run locally:
 Interactive docs: http://localhost:8000/docs
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -57,13 +57,13 @@ class LedgerRequest(BaseModel):
 
 
 @app.get("/health", tags=["meta"])
-def health():
+def health() -> dict[str, str]:
     """Returns API liveness status."""
     return {"status": "ok"}
 
 
 @app.post("/ledger", tags=["ledger"])
-def create_ledger(request: LedgerRequest):
+def create_ledger(request: LedgerRequest) -> dict[str, Any]:
     """
     Generate a structured Botox session ledger.
 
