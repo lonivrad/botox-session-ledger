@@ -25,7 +25,7 @@ jobs:
         run: ruff check .
 
       - name: Type check with mypy
-        run: mypy botox_session_ledger.py api.py app/
+        run: mypy botox_session_ledger.py app/
 
       - name: Run tests with coverage
-        run: pytest tests/ -v --cov=botox_session_ledger --cov=api --cov-report=term-missing --cov-fail-under=80
+        run: pytest tests/ -v --cov=botox_session_ledger --cov=app --cov-report=term-missing --cov-fail-under=80
