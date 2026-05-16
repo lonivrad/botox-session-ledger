@@ -169,7 +169,7 @@ Calculates:
 # Project Structure
 
 ```text
-hw5-Loni/
+botox-session-ledger/
 ├─ agents/
 │  └─ skills/
 │     └─ botox-session-ledger/
@@ -188,7 +188,7 @@ hw5-Loni/
 From the repository root:
 
 ```bash
-cd ~/code/hw5-Loni
+cd ~/code/botox-session-ledger
 ```
 
 Run with Python:

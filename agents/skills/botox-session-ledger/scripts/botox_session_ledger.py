@@ -29,6 +29,10 @@ DEFAULT_TARGET_MARGIN = 0.20
 PRACTICAL_VOLUME_WARNING_THRESHOLD_ML = 0.01
 
 
+# -----------------------------
+# Data models
+# -----------------------------
+
 @dataclass
 class TreatmentEntry:
     area: str
@@ -36,6 +40,38 @@ class TreatmentEntry:
     volume_ml: float
     u100_markings: float
 
+
+@dataclass
+class SessionCosts:
+    botox_product_cost_used: float
+    saline_cost_allocated: float
+    syringes_required: int
+    syringe_cost_total: float
+    prep_pads_low: int
+    prep_pads_high: int
+    prep_pad_cost_low: float
+    prep_pad_cost_high: float
+    glove_cost_total: float
+    consumables_low: float
+    consumables_high: float
+    total_session_cost_low: float
+    total_session_cost_high: float
+    total_session_cost_mid: float
+
+
+@dataclass
+class PricingResult:
+    pricing_label: str
+    recommended_charge: Optional[float]
+    recommended_per_unit: Optional[float]
+    actual_client_charge: Optional[float]
+    gross_margin: Optional[float]
+    gross_margin_percent: Optional[float]
+
+
+# -----------------------------
+# Parsing helpers
+# -----------------------------
 
 def parse_diluent(text: str) -> float:
     match = re.search(r"(\d+(?:\.\d+)?)\s*mL\b", text, re.IGNORECASE)
@@ -157,69 +193,33 @@ def parse_treatment_plan(plan_text: str, concentration: float) -> List[Treatment
     return entries
 
 
+# -----------------------------
+# Calculation functions
+# -----------------------------
+
 def calculate_syringes_required(treatment_area_count: int) -> int:
     """
-    Operational estimate:
-    1 syringe per 1–2 treatment areas.
-    3–4 areas = 2 syringes.
-    5–6 areas = 3 syringes.
+    Operational estimate: 1 syringe per 1-2 treatment areas.
+    3-4 areas = 2 syringes, 5-6 areas = 3 syringes, etc.
 
     This avoids incorrectly treating U-100 syringe markings as Botox units.
     """
     return max(1, math.ceil(treatment_area_count / 2))
 
 
-def format_money(amount: float) -> str:
-    return f"${amount:,.2f}"
-
-
-def format_number(value: float, digits: int = 2) -> str:
-    if abs(value - round(value)) < 1e-9:
-        return str(int(round(value)))
-    return f"{value:.{digits}f}".rstrip("0").rstrip(".")
-
-
-def build_ledger(
-    client: str,
-    product: str,
-    diluent_text: str,
-    treatment_plan: str,
-    pricing_mode: str = "standard",
-    client_charge: Optional[str] = None,
-    custom_price: Optional[str] = None,
-) -> str:
-    product_clean = product.strip() if product else "Botox"
-
-    product_warning = None
-    if product_clean.lower() != "botox":
-        product_warning = (
-            f"Product entered as '{product_clean}'. This skill is designed around "
-            "Botox 100-unit vial assumptions."
-        )
-
-    diluent_ml = parse_diluent(diluent_text)
-    concentration = VIAL_UNITS / diluent_ml
-
-    entries = parse_treatment_plan(treatment_plan, concentration)
-
-    total_units = sum(entry.units for entry in entries)
-    total_volume_ml = sum(entry.volume_ml for entry in entries)
-    total_u100_markings = total_volume_ml * 100
-    expected_remaining_units = VIAL_UNITS - total_units
-    vial_percent_used = total_units / VIAL_UNITS
-
-    treatment_area_count = len(entries)
+def calculate_costs(vial_percent_used: float, treatment_area_count: int) -> SessionCosts:
+    """
+    Calculates all operational costs for a session based on vial usage and treatment areas.
+    """
     syringes_required = calculate_syringes_required(treatment_area_count)
     syringe_cost_total = syringes_required * SYRINGE_COST
 
     prep_pads_low = treatment_area_count
     prep_pads_high = treatment_area_count * 2
-
     prep_pad_cost_low = prep_pads_low * ALCOHOL_PAD_COST
     prep_pad_cost_high = prep_pads_high * ALCOHOL_PAD_COST
 
     glove_cost_total = GLOVES_PER_SESSION * GLOVE_COST
-
     botox_product_cost_used = DEFAULT_VIAL_COST * vial_percent_used
     saline_cost_allocated = DEFAULT_SALINE_COST_PER_VIAL * vial_percent_used
 
@@ -230,12 +230,40 @@ def build_ledger(
     total_session_cost_high = botox_product_cost_used + consumables_high
     total_session_cost_mid = (total_session_cost_low + total_session_cost_high) / 2
 
+    return SessionCosts(
+        botox_product_cost_used=botox_product_cost_used,
+        saline_cost_allocated=saline_cost_allocated,
+        syringes_required=syringes_required,
+        syringe_cost_total=syringe_cost_total,
+        prep_pads_low=prep_pads_low,
+        prep_pads_high=prep_pads_high,
+        prep_pad_cost_low=prep_pad_cost_low,
+        prep_pad_cost_high=prep_pad_cost_high,
+        glove_cost_total=glove_cost_total,
+        consumables_low=consumables_low,
+        consumables_high=consumables_high,
+        total_session_cost_low=total_session_cost_low,
+        total_session_cost_high=total_session_cost_high,
+        total_session_cost_mid=total_session_cost_mid,
+    )
+
+
+def calculate_pricing(
+    total_units: float,
+    total_session_cost_mid: float,
+    pricing_mode: str,
+    client_charge: Optional[str],
+    custom_price: Optional[str],
+) -> PricingResult:
+    """
+    Calculates recommended pricing and gross margin based on pricing mode and session costs.
+    """
     pricing_mode_clean = pricing_mode.strip().lower().replace("_", "-") if pricing_mode else "standard"
     actual_client_charge = parse_money(client_charge)
     custom_price_per_unit = parse_custom_price(custom_price)
 
-    recommended_charge = None
-    recommended_per_unit = None
+    recommended_charge: Optional[float] = None
+    recommended_per_unit: Optional[float] = None
 
     if actual_client_charge is None:
         if pricing_mode_clean in ["family-friend", "family friend", "friend", "family"]:
@@ -261,33 +289,55 @@ def build_ledger(
 
     charge_for_margin = actual_client_charge if actual_client_charge is not None else recommended_charge
 
-    gross_margin = None
-    gross_margin_percent = None
+    gross_margin: Optional[float] = None
+    gross_margin_percent: Optional[float] = None
 
     if charge_for_margin is not None:
         gross_margin = charge_for_margin - total_session_cost_mid
         gross_margin_percent = (gross_margin / charge_for_margin) * 100 if charge_for_margin > 0 else 0
 
-    flags = [
-        "Dose values were user-provided.",
-        "This skill does not validate clinical appropriateness.",
-        "Pricing estimates do not represent final profitability.",
-        "Pricing does not include malpractice insurance, provider compensation, rent, taxes, merchant fees, payroll, marketing, licensing, spoilage, or other fixed operating expenses.",
-        "1 mL = 1 cc. U-100 syringe markings are not cc.",
-    ]
+    return PricingResult(
+        pricing_label=pricing_label,
+        recommended_charge=recommended_charge,
+        recommended_per_unit=recommended_per_unit,
+        actual_client_charge=actual_client_charge,
+        gross_margin=gross_margin,
+        gross_margin_percent=gross_margin_percent,
+    )
 
-    if product_warning:
-        flags.append(product_warning)
 
-    if expected_remaining_units < 0:
-        flags.append("Warning: planned treatment exceeds the 100-unit vial inventory.")
+# -----------------------------
+# Formatting helpers
+# -----------------------------
 
-    for entry in entries:
-        if entry.volume_ml < PRACTICAL_VOLUME_WARNING_THRESHOLD_ML:
-            flags.append(
-                f"Warning: {entry.area} volume is below {PRACTICAL_VOLUME_WARNING_THRESHOLD_ML} mL and may be impractical to measure accurately."
-            )
+def format_money(amount: float) -> str:
+    return f"${amount:,.2f}"
 
+
+def format_number(value: float, digits: int = 2) -> str:
+    if abs(value - round(value)) < 1e-9:
+        return str(int(round(value)))
+    return f"{value:.{digits}f}".rstrip("0").rstrip(".")
+
+
+def format_ledger(
+    client: str,
+    product_clean: str,
+    diluent_ml: float,
+    concentration: float,
+    entries: List[TreatmentEntry],
+    total_units: float,
+    total_volume_ml: float,
+    total_u100_markings: float,
+    expected_remaining_units: float,
+    vial_percent_used: float,
+    costs: SessionCosts,
+    pricing: PricingResult,
+    flags: List[str],
+) -> str:
+    """
+    Formats the complete session ledger as a human-readable string.
+    """
     output = []
 
     output.append("Botox Session Ledger")
@@ -327,42 +377,42 @@ def build_ledger(
     output.append("")
     output.append("Financial summary:")
     output.append("")
-    output.append(f"Product cost used: {format_money(botox_product_cost_used)}")
+    output.append(f"Product cost used: {format_money(costs.botox_product_cost_used)}")
     output.append("")
-    output.append(f"Saline allocation: {format_money(saline_cost_allocated)}")
+    output.append(f"Saline allocation: {format_money(costs.saline_cost_allocated)}")
     output.append("")
-    output.append(f"Syringes required: {syringes_required}")
+    output.append(f"Syringes required: {costs.syringes_required}")
     output.append("")
-    output.append(f"Syringe cost: {format_money(syringe_cost_total)}")
+    output.append(f"Syringe cost: {format_money(costs.syringe_cost_total)}")
     output.append("")
-    output.append(f"Prep pads estimated: {prep_pads_low}–{prep_pads_high}")
+    output.append(f"Prep pads estimated: {costs.prep_pads_low}–{costs.prep_pads_high}")
     output.append("")
-    output.append(f"Prep pad cost: {format_money(prep_pad_cost_low)}–{format_money(prep_pad_cost_high)}")
+    output.append(f"Prep pad cost: {format_money(costs.prep_pad_cost_low)}–{format_money(costs.prep_pad_cost_high)}")
     output.append("")
-    output.append(f"Glove cost: {format_money(glove_cost_total)}")
+    output.append(f"Glove cost: {format_money(costs.glove_cost_total)}")
     output.append("")
-    output.append(f"Consumables: {format_money(consumables_low)}–{format_money(consumables_high)}")
+    output.append(f"Consumables: {format_money(costs.consumables_low)}–{format_money(costs.consumables_high)}")
     output.append("")
-    output.append(f"Total session cost: {format_money(total_session_cost_low)}–{format_money(total_session_cost_high)}")
+    output.append(f"Total session cost: {format_money(costs.total_session_cost_low)}–{format_money(costs.total_session_cost_high)}")
     output.append("")
     output.append("Pricing summary:")
     output.append("")
-    output.append(f"Pricing mode: {pricing_label}")
+    output.append(f"Pricing mode: {pricing.pricing_label}")
     output.append("")
 
-    if actual_client_charge is not None:
-        output.append(f"Client charge: {format_money(actual_client_charge)}")
+    if pricing.actual_client_charge is not None:
+        output.append(f"Client charge: {format_money(pricing.actual_client_charge)}")
     else:
-        output.append(f"Recommended charge: {format_money(recommended_charge)}")
+        output.append(f"Recommended charge: {format_money(pricing.recommended_charge)}")
         output.append("")
-        output.append(f"Recommended per-unit price: {format_money(recommended_per_unit)}/unit")
+        output.append(f"Recommended per-unit price: {format_money(pricing.recommended_per_unit)}/unit")
 
     output.append("")
 
-    if gross_margin is not None and gross_margin_percent is not None:
-        output.append(f"Gross margin: {format_money(gross_margin)}")
+    if pricing.gross_margin is not None and pricing.gross_margin_percent is not None:
+        output.append(f"Gross margin: {format_money(pricing.gross_margin)}")
         output.append("")
-        output.append(f"Gross margin %: {gross_margin_percent:.1f}%")
+        output.append(f"Gross margin %: {pricing.gross_margin_percent:.1f}%")
         output.append("")
 
     output.append("Flags:")
@@ -373,6 +423,84 @@ def build_ledger(
 
     return "\n".join(output)
 
+
+# -----------------------------
+# Orchestrator
+# -----------------------------
+
+def build_ledger(
+    client: str,
+    product: str,
+    diluent_text: str,
+    treatment_plan: str,
+    pricing_mode: str = "standard",
+    client_charge: Optional[str] = None,
+    custom_price: Optional[str] = None,
+) -> str:
+    product_clean = product.strip() if product else "Botox"
+
+    product_warning = None
+    if product_clean.lower() != "botox":
+        product_warning = (
+            f"Product entered as '{product_clean}'. This skill is designed around "
+            "Botox 100-unit vial assumptions."
+        )
+
+    diluent_ml = parse_diluent(diluent_text)
+    concentration = VIAL_UNITS / diluent_ml
+
+    entries = parse_treatment_plan(treatment_plan, concentration)
+
+    total_units = sum(entry.units for entry in entries)
+    total_volume_ml = sum(entry.volume_ml for entry in entries)
+    total_u100_markings = total_volume_ml * 100
+    expected_remaining_units = VIAL_UNITS - total_units
+    vial_percent_used = total_units / VIAL_UNITS
+    treatment_area_count = len(entries)
+
+    costs = calculate_costs(vial_percent_used, treatment_area_count)
+    pricing = calculate_pricing(total_units, costs.total_session_cost_mid, pricing_mode, client_charge, custom_price)
+
+    flags = [
+        "Dose values were user-provided.",
+        "This skill does not validate clinical appropriateness.",
+        "Pricing estimates do not represent final profitability.",
+        "Pricing does not include malpractice insurance, provider compensation, rent, taxes, merchant fees, payroll, marketing, licensing, spoilage, or other fixed operating expenses.",
+        "1 mL = 1 cc. U-100 syringe markings are not cc.",
+    ]
+
+    if product_warning:
+        flags.append(product_warning)
+
+    if expected_remaining_units < 0:
+        flags.append("Warning: planned treatment exceeds the 100-unit vial inventory.")
+
+    for entry in entries:
+        if entry.volume_ml < PRACTICAL_VOLUME_WARNING_THRESHOLD_ML:
+            flags.append(
+                f"Warning: {entry.area} volume is below {PRACTICAL_VOLUME_WARNING_THRESHOLD_ML} mL and may be impractical to measure accurately."
+            )
+
+    return format_ledger(
+        client=client,
+        product_clean=product_clean,
+        diluent_ml=diluent_ml,
+        concentration=concentration,
+        entries=entries,
+        total_units=total_units,
+        total_volume_ml=total_volume_ml,
+        total_u100_markings=total_u100_markings,
+        expected_remaining_units=expected_remaining_units,
+        vial_percent_used=vial_percent_used,
+        costs=costs,
+        pricing=pricing,
+        flags=flags,
+    )
+
+
+# -----------------------------
+# CLI entry point
+# -----------------------------
 
 def main():
     parser = argparse.ArgumentParser(
