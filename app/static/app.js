@@ -560,4 +560,3 @@ async function loadProfitability() {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 loadDashboard();
-</script>
