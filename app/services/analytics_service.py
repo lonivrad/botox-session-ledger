@@ -20,6 +20,14 @@ TOUCH_UP_WEEKS = 14
 REORDER_LEAD_WEEKS = 2  # flag alert when stock covers < 2 weeks of sessions
 
 
+def _utc(dt: datetime) -> datetime:
+    """Ensure a datetime is UTC-aware. SQLite returns naive datetimes even with
+    DateTime(timezone=True); treat them as UTC so comparisons don't crash."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def revenue_report(db: DBSession, period: str = "month") -> RevenueReport:
     """Aggregate revenue by month or quarter."""
     sessions = db.query(Session).filter(Session.gross_margin.isnot(None)).all()
@@ -130,7 +138,9 @@ def reorder_alert(db: DBSession) -> ReorderAlert:
     now = datetime.now(timezone.utc)
     eight_weeks_ago = now - timedelta(weeks=8)
 
-    recent_sessions = db.query(Session).filter(Session.session_date >= eight_weeks_ago).all()
+    # Filter in Python to avoid naive/aware comparison issues with SQLite
+    all_sessions = db.query(Session).all()
+    recent_sessions = [s for s in all_sessions if _utc(s.session_date) >= eight_weeks_ago]
     avg_sessions_per_week = len(recent_sessions) / 8.0
 
     active_vials = db.query(Vial).filter(Vial.status == VialStatus.ACTIVE).all()
@@ -178,7 +188,7 @@ def next_appointment_estimate(last_session_date: datetime) -> datetime:
 def clients_due_for_touchup(db: DBSession) -> list[dict]:
     """Return clients whose estimated next appointment is within the next 4 weeks."""
     now = datetime.now(timezone.utc)
-    four_weeks = now + timedelta(weeks=4)
+    four_weeks_from_now = now + timedelta(weeks=4)
     clients = db.query(Client).all()
     due = []
 
@@ -186,8 +196,8 @@ def clients_due_for_touchup(db: DBSession) -> list[dict]:
         if not client.sessions:
             continue
         last = max(client.sessions, key=lambda s: s.session_date)
-        next_appt = next_appointment_estimate(last.session_date)
-        if next_appt <= four_weeks:
+        next_appt = next_appointment_estimate(_utc(last.session_date))
+        if next_appt <= four_weeks_from_now:
             due.append(
                 {
                     "client_id": client.id,
