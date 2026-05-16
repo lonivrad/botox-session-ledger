@@ -18,6 +18,10 @@ from botox_session_ledger import (
     DEFAULT_VIAL_COST,
     FAMILY_FRIEND_PRICE_PER_UNIT,
     VIAL_UNITS,
+    InvalidDiluentError,
+    InvalidMoneyError,
+    InvalidPricingError,
+    InvalidTreatmentPlanError,
     build_ledger,
     build_ledger_data,
     calculate_costs,
@@ -49,15 +53,15 @@ class TestParseDiluent:
         assert parse_diluent("2.5mL") == 2.5
 
     def test_missing_ml_raises(self):
-        with pytest.raises(ValueError, match="mL"):
+        with pytest.raises(InvalidDiluentError, match="mL"):
             parse_diluent("2.5")
 
     def test_zero_raises(self):
-        with pytest.raises(ValueError, match="greater than zero"):
+        with pytest.raises(InvalidDiluentError, match="greater than zero"):
             parse_diluent("0 mL")
 
     def test_non_numeric_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidDiluentError):
             parse_diluent("two mL")
 
 
@@ -83,11 +87,11 @@ class TestParseMoney:
         assert parse_money(None) is None
 
     def test_negative_raises(self):
-        with pytest.raises(ValueError, match="negative"):
+        with pytest.raises(InvalidMoneyError, match="negative"):
             parse_money("-50")
 
     def test_invalid_string_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidMoneyError):
             parse_money("abc")
 
 
@@ -110,15 +114,15 @@ class TestParseCustomPrice:
         assert parse_custom_price(None) is None
 
     def test_zero_raises(self):
-        with pytest.raises(ValueError, match="greater than zero"):
+        with pytest.raises(InvalidPricingError, match="greater than zero"):
             parse_custom_price("0")
 
     def test_negative_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidPricingError):
             parse_custom_price("-5")
 
     def test_invalid_string_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidPricingError):
             parse_custom_price("abc")
 
 
@@ -159,27 +163,27 @@ class TestParseTreatmentPlan:
         assert pytest.approx(entries[0].u100_markings, rel=1e-4) == 20.0
 
     def test_mg_raises(self):
-        with pytest.raises(ValueError, match="mg"):
+        with pytest.raises(InvalidTreatmentPlanError, match="mg"):
             parse_treatment_plan("Forehead: 8 mg", self.CONCENTRATION)
 
     def test_mcg_raises(self):
-        with pytest.raises(ValueError, match="mcg"):
+        with pytest.raises(InvalidTreatmentPlanError, match="mcg"):
             parse_treatment_plan("Forehead: 8 mcg", self.CONCENTRATION)
 
     def test_negative_units_raises(self):
-        with pytest.raises(ValueError, match="greater than zero"):
+        with pytest.raises(InvalidTreatmentPlanError, match="greater than zero"):
             parse_treatment_plan("Forehead: -8 units", self.CONCENTRATION)
 
     def test_zero_units_raises(self):
-        with pytest.raises(ValueError, match="greater than zero"):
+        with pytest.raises(InvalidTreatmentPlanError, match="greater than zero"):
             parse_treatment_plan("Forehead: 0 units", self.CONCENTRATION)
 
     def test_missing_colon_raises(self):
-        with pytest.raises(ValueError, match="Invalid treatment line"):
+        with pytest.raises(InvalidTreatmentPlanError, match="Invalid treatment line"):
             parse_treatment_plan("Forehead 8 units", self.CONCENTRATION)
 
     def test_empty_plan_raises(self):
-        with pytest.raises(ValueError, match="required"):
+        with pytest.raises(InvalidTreatmentPlanError, match="required"):
             parse_treatment_plan("", self.CONCENTRATION)
 
 
@@ -315,7 +319,7 @@ class TestCalculatePricing:
         )
 
     def test_custom_mode_without_price_raises(self):
-        with pytest.raises(ValueError, match="custom-price"):
+        with pytest.raises(InvalidPricingError, match="custom-price"):
             calculate_pricing(
                 total_units=40,
                 total_session_cost_mid=200.0,
@@ -325,7 +329,7 @@ class TestCalculatePricing:
             )
 
     def test_invalid_pricing_mode_raises(self):
-        with pytest.raises(ValueError, match="Pricing mode"):
+        with pytest.raises(InvalidPricingError, match="Pricing mode"):
             calculate_pricing(
                 total_units=40,
                 total_session_cost_mid=200.0,
