@@ -1,8 +1,5 @@
 # Botox Session Ledger
 
-Video Demo:  
-https://youtu.be/2hc-wjDLE2Q
-
 ---
 
 # Overview
