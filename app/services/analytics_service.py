@@ -45,7 +45,10 @@ def revenue_report(db: DBSession, period: str = "month") -> RevenueReport:
     periods = []
     for key in sorted(buckets.keys()):
         bucket = buckets[key]
-        revenue = sum((s.client_charge or s.recommended_charge or 0.0) for s in bucket)
+        revenue = sum(
+            (s.client_charge if s.client_charge is not None else (s.recommended_charge or 0.0))
+            for s in bucket
+        )
         cost = sum(s.total_session_cost for s in bucket)
         margin = revenue - cost
         periods.append(
@@ -85,11 +88,14 @@ def client_profitability(db: DBSession) -> list[ClientProfitability]:
         if not sessions:
             continue
 
-        revenue = sum((s.client_charge or s.recommended_charge or 0.0) for s in sessions)
+        revenue = sum(
+            (s.client_charge if s.client_charge is not None else (s.recommended_charge or 0.0))
+            for s in sessions
+        )
         cost = sum(s.total_session_cost for s in sessions)
         margin = revenue - cost
         total_units = sum(s.total_units for s in sessions)
-        last_date = max((s.session_date for s in sessions), default=None)
+        last_date = sessions[0].session_date  # relationship is ordered by session_date DESC
 
         results.append(
             ClientProfitability(
@@ -195,7 +201,7 @@ def clients_due_for_touchup(db: DBSession) -> list[dict]:
     for client in clients:
         if not client.sessions:
             continue
-        last = max(client.sessions, key=lambda s: s.session_date)
+        last = client.sessions[0]  # relationship is ordered by session_date DESC
         next_appt = next_appointment_estimate(_utc(last.session_date))
         if next_appt <= four_weeks_from_now:
             due.append(
