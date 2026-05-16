@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.testclient import TestClient
 
-from api import app
+from app.main import app
 
 client = TestClient(app)
 
@@ -36,7 +36,9 @@ class TestHealthEndpoint:
         assert client.get("/health").status_code == 200
 
     def test_returns_ok_status(self):
-        assert client.get("/health").json() == {"status": "ok"}
+        body = client.get("/health").json()
+        assert body["status"] == "ok"
+        assert "version" in body
 
 
 class TestLedgerResponseShape:
