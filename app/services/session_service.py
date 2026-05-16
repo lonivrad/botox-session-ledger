@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session as DBSession
 
-from app.models import Client, Session, SessionArea, Vial, VialAllocation
+from app.models import Client, Session, SessionArea, Vial, VialAllocation, VialStatus
 from app.schemas import SessionCreate
 from app.services.vial_service import allocate_units, refresh_expired_vials
 from botox_session_ledger import build_ledger_data, parse_custom_price, parse_money
@@ -24,7 +24,7 @@ def create_session(db: DBSession, data: SessionCreate) -> Session:
     vial: Vial | None = db.get(Vial, data.vial_id)
     if vial is None:
         raise ValueError(f"Vial {data.vial_id} not found.")
-    if vial.status.value not in ("active",):
+    if vial.status != VialStatus.ACTIVE:
         raise ValueError(
             f"Vial {data.vial_id} is not active (status: {vial.status.value}). "
             "Only active vials can be used for treatment."
