@@ -7,8 +7,10 @@ Covers:
 - calculate_costs
 - calculate_pricing (all three modes)
 - build_ledger integration tests (all four README test cases + edge cases)
+- build_ledger_data and ledger_to_dict (JSON output)
 """
 
+import json
 import pytest
 
 from botox_session_ledger import (
@@ -16,9 +18,11 @@ from botox_session_ledger import (
     FAMILY_FRIEND_PRICE_PER_UNIT,
     VIAL_UNITS,
     build_ledger,
+    build_ledger_data,
     calculate_costs,
     calculate_pricing,
     calculate_syringes_required,
+    ledger_to_dict,
     parse_custom_price,
     parse_diluent,
     parse_money,
@@ -462,3 +466,101 @@ class TestBuildLedger:
         )
         # Both areas parsed → 20 total units
         assert "20" in ledger
+
+
+# ─────────────────────────────────────────────
+# build_ledger_data + ledger_to_dict (JSON output)
+# ─────────────────────────────────────────────
+
+
+class TestJSONOutput:
+    JANE_PLAN = (
+        "Forehead Lines: 8 units\n"
+        "Frown Lines: 12 units\n"
+        "Masseters: 20 units each side"
+    )
+
+    def test_build_ledger_data_returns_ledger_data(self):
+        from botox_session_ledger import LedgerData
+        data = build_ledger_data(
+            client="Jane",
+            product="Botox",
+            diluent_text="2.5 mL",
+            treatment_plan=self.JANE_PLAN,
+            pricing_mode="standard",
+            client_charge="$420",
+        )
+        assert isinstance(data, LedgerData)
+
+    def test_ledger_to_dict_is_json_serializable(self):
+        data = build_ledger_data(
+            client="Jane",
+            product="Botox",
+            diluent_text="2.5 mL",
+            treatment_plan=self.JANE_PLAN,
+            pricing_mode="standard",
+            client_charge="$420",
+        )
+        result = ledger_to_dict(data)
+        # Should not raise
+        serialized = json.dumps(result)
+        assert isinstance(serialized, str)
+
+    def test_dict_contains_top_level_keys(self):
+        data = build_ledger_data(
+            client="Jane",
+            product="Botox",
+            diluent_text="2.5 mL",
+            treatment_plan=self.JANE_PLAN,
+            pricing_mode="standard",
+        )
+        result = ledger_to_dict(data)
+        for key in ("client", "product", "diluent_ml", "concentration", "entries", "costs", "pricing", "flags"):
+            assert key in result
+
+    def test_dict_entries_are_list_of_dicts(self):
+        data = build_ledger_data(
+            client="Jane",
+            product="Botox",
+            diluent_text="2.5 mL",
+            treatment_plan=self.JANE_PLAN,
+            pricing_mode="standard",
+        )
+        result = ledger_to_dict(data)
+        assert isinstance(result["entries"], list)
+        assert all(isinstance(e, dict) for e in result["entries"])
+
+    def test_dict_total_units_correct(self):
+        data = build_ledger_data(
+            client="Jane",
+            product="Botox",
+            diluent_text="2.5 mL",
+            treatment_plan=self.JANE_PLAN,
+            pricing_mode="standard",
+        )
+        assert ledger_to_dict(data)["total_units"] == 60.0
+
+    def test_dict_nested_costs_preserved(self):
+        data = build_ledger_data(
+            client="Jane",
+            product="Botox",
+            diluent_text="2.5 mL",
+            treatment_plan=self.JANE_PLAN,
+            pricing_mode="standard",
+        )
+        result = ledger_to_dict(data)
+        assert "botox_product_cost_used" in result["costs"]
+        assert "total_session_cost_mid" in result["costs"]
+
+    def test_dict_nested_pricing_preserved(self):
+        data = build_ledger_data(
+            client="Jane",
+            product="Botox",
+            diluent_text="2.5 mL",
+            treatment_plan=self.JANE_PLAN,
+            pricing_mode="standard",
+            client_charge="$420",
+        )
+        result = ledger_to_dict(data)
+        assert result["pricing"]["actual_client_charge"] == 420.0
+        assert result["pricing"]["gross_margin_percent"] is not None

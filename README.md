@@ -170,15 +170,24 @@ Calculates:
 
 ```text
 botox-session-ledger/
+├─ botox_session_ledger.py        ← core module (importable directly)
+├─ api.py                         ← FastAPI microservice wrapper
 ├─ agents/
 │  └─ skills/
 │     └─ botox-session-ledger/
 │        ├─ SKILL.md
-│        ├─ scripts/
-│        │  └─ botox_session_ledger.py
 │        └─ references/
 │           └─ botox_cost_assumptions.md
-├─ README.md
+├─ tests/
+│  ├─ conftest.py
+│  ├─ test_ledger.py
+│  └─ test_api.py
+├─ requirements.txt
+├─ requirements-dev.txt
+├─ .github/
+│  └─ workflows/
+│     └─ ci.yml
+└─ README.md
 ```
 
 ---
@@ -194,7 +203,7 @@ cd ~/code/botox-session-ledger
 Run with Python:
 
 ```bash
-python3 agents/skills/botox-session-ledger/scripts/botox_session_ledger.py \
+python3 botox_session_ledger.py \
   --client "Jane" \
   --product "Botox" \
   --diluent "2.5 mL" \

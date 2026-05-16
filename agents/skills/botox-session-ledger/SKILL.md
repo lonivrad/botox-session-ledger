@@ -17,7 +17,7 @@ The model handles orchestration and clarification.
 
 All deterministic parsing, validation, calculations, and formatting are performed by:
 
-`scripts/botox_session_ledger.py`
+`botox_session_ledger.py`
 
 Default Botox pricing, consumables, operational assumptions, and treatment references are stored in:
 
@@ -326,7 +326,7 @@ $X per unit
 
 Use:
 
-`scripts/botox_session_ledger.py`
+`botox_session_ledger.py`
 
 Return the ledger below.
 
