@@ -8,6 +8,29 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 
+# -----------------------------
+# Custom exceptions
+# -----------------------------
+
+class BotoxLedgerError(ValueError):
+    """Base exception for all botox-session-ledger validation errors."""
+
+
+class InvalidDiluentError(BotoxLedgerError):
+    """Raised when the diluent input is missing, malformed, or non-positive."""
+
+
+class InvalidTreatmentPlanError(BotoxLedgerError):
+    """Raised when the treatment plan has a missing, malformed, or invalid entry."""
+
+
+class InvalidPricingError(BotoxLedgerError):
+    """Raised when a pricing mode is unrecognized or required pricing inputs are absent."""
+
+
+class InvalidMoneyError(BotoxLedgerError):
+    """Raised when a money value (client charge, custom price) is malformed or negative."""
+
 
 # -----------------------------
 # Default Botox assumptions
@@ -97,12 +120,12 @@ def parse_diluent(text: str) -> float:
     match = re.search(r"(\d+(?:\.\d+)?)\s*mL\b", text, re.IGNORECASE)
 
     if not match:
-        raise ValueError("Diluent must be provided in mL. Example: '2.5 mL'.")
+        raise InvalidDiluentError("Diluent must be provided in mL. Example: '2.5 mL'.")
 
     diluent = float(match.group(1))
 
     if diluent <= 0:
-        raise ValueError("Diluent amount must be greater than zero.")
+        raise InvalidDiluentError("Diluent amount must be greater than zero.")
 
     return diluent
 
@@ -116,10 +139,10 @@ def parse_money(value: Optional[str]) -> Optional[float]:
     try:
         amount = float(cleaned)
     except ValueError:
-        raise ValueError(f"Invalid money value: {value}")
+        raise InvalidMoneyError(f"Invalid money value: {value}")
 
     if amount < 0:
-        raise ValueError("Money values cannot be negative.")
+        raise InvalidMoneyError("Money values cannot be negative.")
 
     return amount
 
@@ -139,10 +162,10 @@ def parse_custom_price(value: Optional[str]) -> Optional[float]:
     try:
         price = float(cleaned)
     except ValueError:
-        raise ValueError("Custom price must be numeric. Example: '12' or '$12/unit'.")
+        raise InvalidPricingError("Custom price must be numeric. Example: '12' or '$12/unit'.")
 
     if price <= 0:
-        raise ValueError("Custom price per unit must be greater than zero.")
+        raise InvalidPricingError("Custom price per unit must be greater than zero.")
 
     return price
 
@@ -159,14 +182,14 @@ def parse_treatment_plan(plan_text: str, concentration: float) -> List[Treatment
     """
 
     if not plan_text.strip():
-        raise ValueError("Treatment plan is required.")
+        raise InvalidTreatmentPlanError("Treatment plan is required.")
 
     entries: List[TreatmentEntry] = []
     lines = [line.strip() for line in plan_text.splitlines() if line.strip()]
 
     for line in lines:
         if ":" not in line:
-            raise ValueError(
+            raise InvalidTreatmentPlanError(
                 f"Invalid treatment line: '{line}'. Expected format like 'Forehead Lines: 8 units'."
             )
 
@@ -175,24 +198,24 @@ def parse_treatment_plan(plan_text: str, concentration: float) -> List[Treatment
         detail = detail.strip()
 
         if not area:
-            raise ValueError(f"Missing treatment area in line: '{line}'.")
+            raise InvalidTreatmentPlanError(f"Missing treatment area in line: '{line}'.")
 
         if re.search(r"\bmg\b|\bmcg\b", detail, re.IGNORECASE):
-            raise ValueError(
+            raise InvalidTreatmentPlanError(
                 f"Invalid unit in line '{line}'. Botox treatment plans must use units, not mg or mcg."
             )
 
         number_match = re.search(r"(-?\d+(?:\.\d+)?)\s*units?\b", detail, re.IGNORECASE)
 
         if not number_match:
-            raise ValueError(
+            raise InvalidTreatmentPlanError(
                 f"Invalid or missing units in line '{line}'. Expected format like '8 units'."
             )
 
         units = float(number_match.group(1))
 
         if units <= 0:
-            raise ValueError(f"Treatment units must be greater than zero in line: '{line}'.")
+            raise InvalidTreatmentPlanError(f"Treatment units must be greater than zero in line: '{line}'.")
 
         if re.search(r"\beach side\b|\bper side\b|\beach masseter\b", detail, re.IGNORECASE):
             units *= 2
@@ -292,7 +315,7 @@ def calculate_pricing(
             pricing_label = "Family-friend pricing"
         elif pricing_mode_clean == "custom":
             if custom_price_per_unit is None:
-                raise ValueError(
+                raise InvalidPricingError(
                     "Custom pricing mode requires --custom-price. Example: --custom-price '$12/unit'."
                 )
             recommended_per_unit = custom_price_per_unit
@@ -303,7 +326,7 @@ def calculate_pricing(
             recommended_per_unit = recommended_charge / total_units if total_units > 0 else 0
             pricing_label = "Standard target-margin pricing"
         else:
-            raise ValueError("Pricing mode must be one of: standard, family-friend, custom.")
+            raise InvalidPricingError("Pricing mode must be one of: standard, family-friend, custom.")
     else:
         pricing_label = "Actual client charge provided"
 

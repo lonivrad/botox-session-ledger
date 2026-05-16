@@ -1,5 +1,8 @@
 # Botox Session Ledger
 
+![CI](https://github.com/lonivrad/botox-session-ledger/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11+-blue)
+
 ---
 
 # Overview

@@ -4,13 +4,14 @@ Integration tests for the FastAPI ledger endpoint.
 Uses FastAPI's built-in TestClient (backed by httpx) — no server needed.
 """
 
-import sys
 import os
+import sys
 
 # Ensure api.py at the repo root is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.testclient import TestClient
+
 from api import app
 
 client = TestClient(app)

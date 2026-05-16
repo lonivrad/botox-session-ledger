@@ -11,6 +11,7 @@ Covers:
 """
 
 import json
+
 import pytest
 
 from botox_session_ledger import (
@@ -28,7 +29,6 @@ from botox_session_ledger import (
     parse_money,
     parse_treatment_plan,
 )
-
 
 # ─────────────────────────────────────────────
 # parse_diluent

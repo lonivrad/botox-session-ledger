@@ -21,5 +21,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Run tests
-        run: pytest tests/ -v
+      - name: Lint with ruff
+        run: ruff check .
+
+      - name: Run tests with coverage
+        run: pytest tests/ -v --cov=botox_session_ledger --cov=api --cov-report=term-missing --cov-fail-under=80

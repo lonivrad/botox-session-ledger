@@ -8,7 +8,6 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 
-
 # -----------------------------
 # Default Botox assumptions
 # -----------------------------
