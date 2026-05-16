@@ -4,13 +4,13 @@ install:
 	pip install -r requirements-dev.txt
 
 test:
-	pytest tests/ -v --cov=botox_session_ledger --cov=api --cov-report=term-missing
+	pytest tests/ -v --cov=botox_session_ledger --cov=app --cov-report=term-missing
 
 lint:
 	ruff check .
 
 typecheck:
-	mypy botox_session_ledger.py api.py
+	mypy botox_session_ledger.py app/
 
 migrate:
 	alembic upgrade head
