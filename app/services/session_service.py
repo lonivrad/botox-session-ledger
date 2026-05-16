@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session as DBSession
 from app.models import Client, Session, SessionArea, Vial, VialAllocation
 from app.schemas import SessionCreate
 from app.services.vial_service import allocate_units, refresh_expired_vials
-from botox_session_ledger import build_ledger_data
+from botox_session_ledger import build_ledger_data, parse_custom_price, parse_money
 
 
 def create_session(db: DBSession, data: SessionCreate) -> Session:
@@ -34,15 +34,14 @@ def create_session(db: DBSession, data: SessionCreate) -> Session:
     if client is None:
         raise ValueError(f"Client {data.client_id} not found.")
 
-    treatment_plan = data.treatment_plan.replace(";", "\n")
     diluent_text = f"{vial.diluent_ml} mL"
 
-    # Run core ledger calculations
+    # Run core ledger calculations (semicolons normalised inside build_ledger_data)
     ledger = build_ledger_data(
         client=client.name,
         product=vial.product,
         diluent_text=diluent_text,
-        treatment_plan=treatment_plan,
+        treatment_plan=data.treatment_plan,
         pricing_mode=data.pricing_mode,
         client_charge=data.client_charge,
         custom_price=data.custom_price,
@@ -56,28 +55,12 @@ def create_session(db: DBSession, data: SessionCreate) -> Session:
 
     session_date = data.session_date or datetime.now(timezone.utc)
 
-    # Parse money values for storage
-    client_charge_float: float | None = None
-    if data.client_charge:
-        cleaned = data.client_charge.replace("$", "").replace(",", "").strip()
-        try:
-            client_charge_float = float(cleaned)
-        except ValueError:
-            pass
-
-    custom_price_float: float | None = None
-    if data.custom_price:
-        cleaned = (
-            data.custom_price.lower()
-            .replace("$", "")
-            .replace("/unit", "")
-            .replace("per unit", "")
-            .strip()
-        )
-        try:
-            custom_price_float = float(cleaned)
-        except ValueError:
-            pass
+    # Parse money values for storage using the canonical parsers from the core lib.
+    # These raise InvalidMoneyError / InvalidPricingError on bad input, which is the
+    # correct behaviour (the ledger calculation above already validated the strings, so
+    # reaching here with an invalid value would be a programmer error, not a user error).
+    client_charge_float: float | None = parse_money(data.client_charge)
+    custom_price_float: float | None = parse_custom_price(data.custom_price)
 
     session = Session(
         client_id=data.client_id,

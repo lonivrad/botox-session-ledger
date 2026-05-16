@@ -15,7 +15,8 @@ router = APIRouter(prefix="/clients", tags=["clients"])
 
 def _enrich(client: Client) -> ClientOut:
     sessions = client.sessions
-    last_session = max(sessions, key=lambda s: s.session_date) if sessions else None
+    # Relationship is ordered by session_date DESC, so the most recent is first.
+    last_session = sessions[0] if sessions else None
     next_appt = next_appointment_estimate(last_session.session_date) if last_session else None
     return ClientOut(
         id=client.id,
@@ -46,7 +47,7 @@ def list_clients(db: DBSession = Depends(get_db)) -> list[ClientSummary]:
     result = []
     for c in clients:
         sessions = c.sessions
-        last = max(sessions, key=lambda s: s.session_date) if sessions else None
+        last = sessions[0] if sessions else None  # relationship is ordered DESC
         result.append(
             ClientSummary(
                 id=c.id,

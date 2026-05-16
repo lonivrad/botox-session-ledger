@@ -33,7 +33,7 @@ def _to_out(vial) -> VialOut:  # type: ignore[no-untyped-def]
         opened_at=vial.opened_at,
         expires_at=vial.expires_at,
         status=vial.status.value,
-        percent_used=round(vial.percent_used * 100, 1),
+        percent_used_pct=round(vial.percent_used * 100, 1),
         created_at=vial.created_at,
     )
 

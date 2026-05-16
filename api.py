@@ -10,6 +10,8 @@ Interactive docs: http://localhost:8000/docs
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
@@ -72,14 +74,12 @@ def create_ledger(request: LedgerRequest) -> dict[str, Any]:
 
     Raises 422 on invalid inputs (bad diluent format, mg/mcg units, negative values, etc.).
     """
-    treatment_plan = request.treatment_plan.replace(";", "\n")
-
     try:
         data = build_ledger_data(
             client=request.client,
             product=request.product,
             diluent_text=request.diluent,
-            treatment_plan=treatment_plan,
+            treatment_plan=request.treatment_plan,  # semicolons normalised inside build_ledger_data
             pricing_mode=request.pricing_mode,
             client_charge=request.client_charge,
             custom_price=request.custom_price,

@@ -1079,7 +1079,7 @@ function renderVials() {
   }
   grid.innerHTML = list.map(v => {
     const badgeCls = { active:'badge-active', expired:'badge-expired', depleted:'badge-depleted', unopened:'badge-unopened' }[v.status] || 'badge-depleted';
-    const remPct = Math.max(0, Math.min(100, 100 - (v.percent_used||0)));
+    const remPct = Math.max(0, Math.min(100, 100 - (v.percent_used_pct||0)));
     const fillColor = remPct > 50 ? 'var(--ok)' : remPct > 20 ? 'var(--warn)' : 'var(--err)';
     const expColor  = v.status === 'active' ? 'var(--warn)' : 'var(--muted)';
     return `

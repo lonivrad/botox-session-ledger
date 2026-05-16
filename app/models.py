@@ -115,6 +115,7 @@ class Vial(Base):
 
     @property
     def percent_used(self) -> float:
+        """Fraction of vial used, 0.0–1.0. Multiply by 100 for a display percentage."""
         return self.units_used / self.units_total if self.units_total > 0 else 0.0
 
     def is_expired(self) -> bool:
@@ -162,7 +163,10 @@ class Session(Base):
 
     @property
     def effective_charge(self) -> float | None:
-        return self.client_charge or self.recommended_charge
+        # Use `is not None` rather than truthiness so that a comped session
+        # (client_charge == 0.0) is preserved correctly instead of falling
+        # through to recommended_charge.
+        return self.client_charge if self.client_charge is not None else self.recommended_charge
 
 
 class SessionArea(Base):

@@ -103,7 +103,7 @@ class VialOut(BaseModel):
     opened_at: datetime | None
     expires_at: datetime | None
     status: str
-    percent_used: float
+    percent_used_pct: float  # 0–100, already multiplied by 100 in the router
     created_at: datetime
 
     model_config = {"from_attributes": True}
